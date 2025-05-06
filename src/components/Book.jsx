@@ -9,7 +9,11 @@ export const Book = ({ ...props }) => {
     <group {...props}>
       {
         [...pages].map((pageData, index) => (
-          <Page position-x={index * 0.15} key={index} number={index} {...pageData} />
+          index === 0 ? (
+            <Page position-x={index * 0.15} key={index} number={index} {...pageData} />
+          ) : (
+            null
+          )
         ))
       }
     </group>
