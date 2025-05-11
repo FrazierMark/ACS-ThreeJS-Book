@@ -1,10 +1,18 @@
 import { useSelector, useDispatch } from 'react-redux';
-import { selectCurrentPage, allPages, setPage } from '../features/pagesSlice';
+import { useEffect } from 'react';
+import { getCurrentPage, getAllPages, setPage } from '../features/pagesSlice';
 
 export const UI = () => {
   const dispatch = useDispatch();
-  const page = useSelector(selectCurrentPage);
-  const pages = useSelector(allPages);
+  const page = useSelector(getCurrentPage);
+  const pages = useSelector(getAllPages);
+
+  useEffect(() => {
+    const audio = new Audio('/audio/page-flip-01a.mp3');
+    // audio.volume = 0.2;
+    audio.play();
+  }, [page]);
+
 
   return (
     <>

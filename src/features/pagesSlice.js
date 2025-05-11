@@ -53,6 +53,6 @@ const pagesSlice = createSlice({
 });
 
 export const { setPage } = pagesSlice.actions;
-export const selectCurrentPage = (state) => state.pages.currentPage;
-export const allPages = (state) => state.pages.pages;
+export const getCurrentPage = (state) => state.pages.currentPage;
+export const getAllPages = (state) => state.pages.pages;
 export default pagesSlice.reducer;

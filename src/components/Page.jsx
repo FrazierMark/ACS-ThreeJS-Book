@@ -3,8 +3,9 @@ import { BoxGeometry, MeshStandardMaterial, SkinnedMesh, Bone, Skeleton, Vector3
 import { useHelper, useTexture } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useSelector } from "react-redux";
-import { allPages } from "../features/pagesSlice";
-import { degToRad } from "three/src/math/MathUtils";
+import { getAllPages } from "../features/pagesSlice";
+import { degToRad, MathUtils } from "three/src/math/MathUtils";
+import { easing } from 'maath';
 import { SkeletonHelper, SRGBColorSpace } from "three";
 
 const PAGE_WIDTH = 1.28;
@@ -12,6 +13,11 @@ const PAGE_HEIGHT = 1.71; //4:3 aspect ratio
 const PAGE_DEPTH = 0.003;
 const PAGE_SEGMENTS = 30;
 const SEGMENT_WIDTH = PAGE_WIDTH / PAGE_SEGMENTS;
+
+const easingFactor = 0.5;
+const insideCurveStrength = 0.18;
+const outsideCurveStrength = 0.05;
+const turningCurveStrength = 0.09;
 
 const pageGeometry = new BoxGeometry(
   PAGE_WIDTH,
@@ -70,8 +76,8 @@ const pageMaterials = [
   }),
 ]
 
-export const Page = ({ number, front, back, page, opened, ...props }) => {
-  const pages = useSelector(allPages);
+export const Page = ({ number, front, back, page, opened, bookClosed, ...props }) => {
+  const pages = useSelector(getAllPages);
 
   // Preload textures when component mounts
   useEffect(() => {
@@ -91,45 +97,52 @@ export const Page = ({ number, front, back, page, opened, ...props }) => {
   picture.colorSpace = picture2.colorSpace = SRGBColorSpace;
 
   const groupRef = useRef();
+  const lastOpened = useRef(opened);
+  const turnedAt = useRef(0);
   const skinnedMeshRef = useRef();
 
   const manualSkinnedMesh = useMemo(() => {
     const bones = [];
-    const rootBone = new Bone();
-    rootBone.position.set(0, 0, 0);
-    bones.push(rootBone);
-
     // Create the bone chain
-    for (let i = 1; i < PAGE_SEGMENTS + 1; i++) {
-      const bone = new Bone();
-      bone.position.x = SEGMENT_WIDTH;
-      bones[i - 1].add(bone);
+    for (let i = 0; i <= PAGE_SEGMENTS; i++) {
+      let bone = new Bone();
       bones.push(bone);
-    }
+      if (i === 0) {
+        bone.position.x = 0;
+      } else {
+        bone.position.x = SEGMENT_WIDTH;
+      }
 
-    // Create the skeleton with the bone hierarchy
+      if (i > 0) {
+        bones[i - 1].add(bone) // attach the bone to the previous bone
+      }
+    }
     const skeleton = new Skeleton(bones);
 
-    // Create the skinned mesh
-    const materials = [...pageMaterials,
-    new MeshStandardMaterial({
-      color: whiteColor,
-      map: picture,
-      ...(number === 0) ? {
-        roughnessMap: pictureRoughness,
-      } : {
-        roughness: 0.1 // closer to 1 is more matte
-      }
-    }),
-    new MeshStandardMaterial({
-      color: whiteColor,
-      map: picture2,
-      ...(number === pages.length - 1) ? {
-        roughnessMap: pictureRoughness,
-      } : {
-        roughness: 0.1 // closer to 1 is more matte
-      }
-    }),
+    const materials = [
+      ...pageMaterials,
+      new MeshStandardMaterial({
+        color: whiteColor,
+        map: picture,
+        ...(number === 0
+          ? {
+            roughnessMap: pictureRoughness,
+          }
+          : {
+            roughness: 0.1,
+          }),
+      }),
+      new MeshStandardMaterial({
+        color: whiteColor,
+        map: picture2,
+        ...(number === pages.length - 1
+          ? {
+            roughnessMap: pictureRoughness,
+          }
+          : {
+            roughness: 0.1,
+          }),
+      }),
     ];
 
     const mesh = new SkinnedMesh(pageGeometry, materials);
@@ -137,26 +150,48 @@ export const Page = ({ number, front, back, page, opened, ...props }) => {
     mesh.receiveShadow = true;
     mesh.frustumCulled = false;
 
-    // Add the root bone to the mesh and bind the skeleton
-    mesh.add(bones[0]);
+    mesh.add(skeleton.bones[0]);
     mesh.bind(skeleton);
-
-    // Update the skeleton's matrices
-    skeleton.pose();
-
     return mesh;
   }, []);
 
   useHelper(skinnedMeshRef, SkeletonHelper, "red");
-  useFrame(() => {
+  useFrame((_, delta) => {
     if (!skinnedMeshRef.current) return;
 
+    if (lastOpened.current !== opened) {
+      turnedAt.current = +new Date();
+      lastOpened.current = opened;
+    }
+    let turningTime = Math.min(400, new Date() - turnedAt.current) / 400;
+    turningTime = Math.sin(turningTime * Math.PI);
 
     let targetRotation = opened ? -Math.PI / 2 : Math.PI / 2;
-    targetRotation += degToRad(number * 0.5)
+    if (!bookClosed) {
+      targetRotation += degToRad(number * 0.8)
+    }
 
     const bones = skinnedMeshRef.current.skeleton.bones;
-    bones[0].rotation.y = targetRotation;
+    for (let i = 0; i < bones.length; i++) {
+      const target = i === 0 ? groupRef.current : bones[i];
+
+      const insideCurveIntensity = i < 8 ? Math.sin(i * 0.2 + 0.25) : 0;
+      const outsideCurveIntensity = i >= 8 ? Math.cos(i * 0.3 + 0.09) : 0;
+      const turningCurveIntensity = Math.sin(i * Math.PI * (1 / bones.length)) * turningTime;
+      let rotationAngle = insideCurveStrength * insideCurveIntensity * targetRotation -
+        outsideCurveStrength * outsideCurveIntensity * targetRotation +
+        turningCurveStrength * turningCurveIntensity * targetRotation;
+
+      if (bookClosed) {
+        if (i === 0) {
+          rotationAngle = targetRotation;
+        } else {
+          rotationAngle = 0
+        }
+      }
+      easing.dampAngle(target.rotation, "y", rotationAngle, easingFactor, delta);
+    }
+
   });
 
   return (
