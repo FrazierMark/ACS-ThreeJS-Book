@@ -1,8 +1,8 @@
 .book-search {
-	max-width: 1200px;
+	max-width: 100%;
 	margin: 0 auto;
 	padding: 20px;
-	z-index: 10;
+	z-index: 20;
 }
 
 .book-search h2 {
@@ -120,6 +120,7 @@
 
 .books-grid {
 	display: grid;
+	width: 100%;
 	grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
 	gap: 25px;
 }

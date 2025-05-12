@@ -75,7 +75,7 @@ export const fetchBooks = (
 	query,
 	searchType = 'general',
 	page = 1,
-	limit = 20
+	limit = 10
 ) => {
 	return async (dispatch) => {
 		dispatch(fetchBooksRequest());
@@ -154,6 +154,8 @@ export const fetchBookDetails = (book) => {
 		try {
 			// Use the comprehensive method to get all book data
 			const completeData = await getCompleteBookData(book);
+
+			console.log('completeData', completeData);
 
 			dispatch(fetchBookDetailsSuccess(completeData));
 			return completeData;

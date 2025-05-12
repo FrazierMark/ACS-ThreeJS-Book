@@ -1,11 +1,31 @@
 import { useSelector, useDispatch } from 'react-redux';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { getCurrentPage, getAllPages, setPage } from '../features/pagesSlice';
+import { fetchBooks, loadMoreBooks, setSearchParams, fetchBookDetails, clearBooks, clearBookDetails } from '../redux/actions/bookActions';
+import { getCoverImageUrl } from '../services/openLibraryApi';
+import '../styles/BookSearch.css';
 
 export const UI = () => {
   const dispatch = useDispatch();
   const page = useSelector(getCurrentPage);
   const pages = useSelector(getAllPages);
+  const selectedBook = useSelector(state => state.books.selectedBook);
+  const { books, loading, error, searchQuery, searchType } = useSelector(state => state.books);
+
+  const [localSearchQuery, setLocalSearchQuery] = useState('');
+  const [localSearchType, setLocalSearchType] = useState('general');
+  const [featuredSearchTerm] = useState('classics');
+
+  useEffect(() => {
+    if (books.length === 0 && !loading) {
+      dispatch(fetchBooks(featuredSearchTerm));
+    }
+  }, [dispatch, books.length, loading, featuredSearchTerm]);
+
+  useEffect(() => {
+    setLocalSearchType(searchType);
+    setLocalSearchQuery(searchQuery);
+  }, [searchType, searchQuery]);
 
   useEffect(() => {
     const audio = new Audio('/audio/page-flip-01a.mp3');
@@ -13,99 +33,129 @@ export const UI = () => {
     audio.play();
   }, [page]);
 
+  const handleSearch = (e) => {
+    e.preventDefault();
+    if (!localSearchQuery.trim()) return;
+    dispatch(setSearchParams(localSearchType, localSearchQuery));
+    dispatch(fetchBooks(localSearchQuery, localSearchType));
+  };
+
+  const handleBookCardClick = (book) => {
+    dispatch(fetchBookDetails(book))
+      .then(() => {
+        dispatch(clearBooks());
+      })
+      .catch(err => {
+        console.error("Error fetching book details:", err);
+      });
+  };
 
   return (
     <>
-      <main className=" pointer-events-none select-none -z-10 fixed  inset-0  flex justify-between flex-col">
+      <main className="pointer-events-none select-none z-10 inset-0 flex justify-between flex-col">
         <a
-          className="pointer-events-auto mt-10 ml-10 -z-10"
+          className="pointer-events-auto mt-10 ml-10"
           href=""
         >
-          <img className="w-20" src="/images/Shape.png" />
+          <img className="w-14" src="/images/Shape.png" />
         </a>
-        <div className="w-full overflow-auto pointer-events-auto flex justify-center">
-          <div className="overflow-auto flex items-center gap-4 max-w-full p-10">
-            {[...pages].map((_, index) => (
+
+        {selectedBook && (
+          <div className="w-full overflow-auto pointer-events-auto fixed flex justify-center">
+            <div className="overflow-auto flex items-center gap-4 max-w-full p-10">
+              {[...pages].map((_, index) => (
+                <button
+                  key={index}
+                  className={`border-transparent hover:border-white transition-all duration-300  px-4 py-3 rounded-full  text-lg uppercase shrink-0 border ${index === page
+                    ? "bg-white/90 text-black"
+                    : "bg-black/30 text-white"
+                    }`}
+                  onClick={() => dispatch(setPage(index))}
+                >
+                  {index === 0 ? "Cover" : `Page ${index}`}
+                </button>
+              ))}
               <button
-                key={index}
-                className={`border-transparent hover:border-white transition-all duration-300  px-4 py-3 rounded-full  text-lg uppercase shrink-0 border ${index === page
+                className={`border-transparent hover:border-white transition-all duration-300  px-4 py-3 rounded-full  text-lg uppercase shrink-0 border ${page === pages.length
                   ? "bg-white/90 text-black"
                   : "bg-black/30 text-white"
                   }`}
-                onClick={() => dispatch(setPage(index))}
+                onClick={() => dispatch(setPage(pages.length))}
               >
-                {index === 0 ? "Cover" : `Page ${index}`}
+                Back Cover
               </button>
-            ))}
-            <button
-              className={`border-transparent hover:border-white transition-all duration-300  px-4 py-3 rounded-full  text-lg uppercase shrink-0 border ${page === pages.length
-                ? "bg-white/90 text-black"
-                : "bg-black/30 text-white"
-                }`}
-              onClick={() => dispatch(setPage(pages.length))}
-            >
-              Back Cover
-            </button>
+            </div>
           </div>
-        </div>
-      </main>
+        )}
 
-      <div className="fixed inset-0 flex items-center -rotate-2 select-none hidden">
-        <div className="relative">
-          <div className="bg-white/0  animate-horizontal-scroll flex items-center gap-8 w-max px-8">
-            <h1 className="shrink-0 text-white text-10xl font-black ">
-              Frazier
-            </h1>
-            <h2 className="shrink-0 text-white text-8xl italic font-light">
-              React Three Fiber
-            </h2>
-            <h2 className="shrink-0 text-white text-12xl font-bold">
-              Three.js
-            </h2>
-            <h2 className="shrink-0 text-transparent text-12xl font-bold italic outline-text">
-              Ultimate Guide
-            </h2>
-            <h2 className="shrink-0 text-white text-9xl font-medium">
-              Tutorials
-            </h2>
-            <h2 className="shrink-0 text-white text-9xl font-extralight italic">
-              Learn
-            </h2>
-            <h2 className="shrink-0 text-white text-13xl font-bold">
-              Practice
-            </h2>
-            <h2 className="shrink-0 text-transparent text-13xl font-bold outline-text italic">
-              Creative
-            </h2>
+        {!selectedBook && (
+          <div className="book-search pointer-events-auto w-[100%] max-w-[1400px] mx-auto mb-16 my-5 mt-10 bg-black/70 rounded-lg">
+            <h2 className="text-white">Open Library Book Search</h2>
+
+            {error && <div className="error">Error: {error}</div>}
+
+            <form onSubmit={handleSearch}>
+              <div className="search-controls">
+                <input
+                  type="text"
+                  value={localSearchQuery}
+                  onChange={(e) => setLocalSearchQuery(e.target.value)}
+                  placeholder="Search for books..."
+                  disabled={loading}
+                />
+
+                <select
+                  value={localSearchType}
+                  onChange={(e) => setLocalSearchType(e.target.value)}
+                  disabled={loading}
+                >
+                  <option value="general">All</option>
+                  <option value="title">Title</option>
+                  <option value="author">Author</option>
+                </select>
+
+                <button
+                  type="submit"
+                  disabled={loading || !localSearchQuery.trim()}
+                >
+                  {loading && books.length === 0 ? 'Loading...' : 'Search'}
+                </button>
+              </div>
+            </form>
+
+            {loading && books.length === 0 ? (
+              <div className="loading text-white">Loading books...</div>
+            ) : (
+              <div className="books-grid pb-4 mb-10">
+                {books.length > 0 ? (
+                  books.slice(0, 12).map((book) => (
+                    <div
+                      key={book.key}
+                      className={`book-card`}
+                      onClick={() => handleBookCardClick(book)}
+                      role="button"
+                      aria-label={`View details for ${book.title}`}
+                      tabIndex={0}
+                    >
+                      {book.cover_i && (
+                        <img
+                          src={getCoverImageUrl(book.cover_i)}
+                          alt={book.title}
+                        />
+                      )}
+                      <h3>{book.title}</h3>
+                      {book.author_name && <p>By: {book.author_name.join(', ')}</p>}
+                      {book.first_publish_year && <p>Published: {book.first_publish_year}</p>}
+                    </div>
+                  ))
+                ) : (
+                  <p className="no-results text-white">No books found. Try a different search term.</p>
+                )}
+              </div>
+            )}
           </div>
-          <div className="absolute top-0 left-0 bg-white/0 animate-horizontal-scroll-2 flex items-center gap-8 px-8 w-max">
-            <h1 className="shrink-0 text-white text-10xl font-black ">
-              Mark Frazier
-            </h1>
-            <h2 className="shrink-0 text-white text-8xl italic font-light">
-              React Three Fiber
-            </h2>
-            <h2 className="shrink-0 text-white text-12xl font-bold">
-              Three.js
-            </h2>
-            <h2 className="shrink-0 text-transparent text-12xl font-bold italic outline-text">
-              Ultimate Guide
-            </h2>
-            <h2 className="shrink-0 text-white text-9xl font-medium">
-              Tutorials
-            </h2>
-            <h2 className="shrink-0 text-white text-9xl font-extralight italic">
-              Learn
-            </h2>
-            <h2 className="shrink-0 text-white text-13xl font-bold">
-              Practice
-            </h2>
-            <h2 className="shrink-0 text-transparent text-13xl font-bold outline-text italic">
-              Creative
-            </h2>
-          </div>
-        </div>
-      </div>
+        )}
+      </main>
     </>
   );
 };

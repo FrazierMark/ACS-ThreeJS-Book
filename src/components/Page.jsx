@@ -234,7 +234,7 @@ export const Page = ({ number, front, back, page, opened, bookClosed, ...props }
     return mesh;
   }, [picture, picture2, isFrontCover, isBackCover]);
 
-  useHelper(skinnedMeshRef, SkeletonHelper, "red");
+  // useHelper(skinnedMeshRef, SkeletonHelper, "red");
   useFrame((_, delta) => {
     if (!skinnedMeshRef.current) return;
 

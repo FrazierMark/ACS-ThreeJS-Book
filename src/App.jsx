@@ -3,20 +3,36 @@ import { Canvas } from "@react-three/fiber";
 import { Suspense } from "react";
 import { Experience } from "./components/Experience";
 import { UI } from "./components/UI";
-import BookSearch from "./components/BookSearch";
+import { useSelector } from "react-redux";
+import ChatWindow from "./components/ChatWindow";
+
 function App() {
+  const selectedBook = useSelector(state => state.books.selectedBook);
+
   return (
     <>
-      <BookSearch />
       <UI />
       <Loader />
-      <Canvas shadows camera={{ position: [-0.5, 1, 4], fov: 45 }}>
-        <group position-y={0}>
-          <Suspense fallback={null}>
-            <Experience />
-          </Suspense>
-        </group>
-      </Canvas>
+
+      {selectedBook && (
+        <div className="flex w-full h-screen">
+          {/* Chat Window (left side) */}
+          <div className="w-1/3 p-4 pt-20">
+            <ChatWindow />
+          </div>
+
+          {/* 3D Book (right side) */}
+          <div className="w-2/3">
+            <Canvas shadows camera={{ position: [-0.5, 1, 4], fov: 45 }}>
+              <group position-y={0}>
+                <Suspense fallback={null}>
+                  <Experience />
+                </Suspense>
+              </group>
+            </Canvas>
+          </div>
+        </div>
+      )}
     </>
   );
 }

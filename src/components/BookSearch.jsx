@@ -11,6 +11,7 @@ import {
 } from '../redux/actions/bookActions';
 import { getCoverImageUrl } from '../services/openLibraryApi';
 import '../styles/BookSearch.css';
+import * as THREE from 'three';
 
 const BookSearch = () => {
   const dispatch = useDispatch();
@@ -28,7 +29,7 @@ const BookSearch = () => {
 
   const [localSearchQuery, setLocalSearchQuery] = useState('');
   const [localSearchType, setLocalSearchType] = useState('general');
-  const [featuredSearchTerm] = useState('science fiction');
+  const [featuredSearchTerm] = useState('classics');
   const bookSearchRef = useRef(null);
 
   // Load initial featured books on component mount
@@ -44,18 +45,6 @@ const BookSearch = () => {
     setLocalSearchQuery(searchQuery);
   }, [searchType, searchQuery]);
 
-  // Scroll to 3D view when a book is selected
-  useEffect(() => {
-    if (selectedBook) {
-      // Give a small delay to allow the 3D scene to render
-      setTimeout(() => {
-        window.scrollTo({
-          top: window.innerHeight,
-          behavior: 'smooth'
-        });
-      }, 500);
-    }
-  }, [selectedBook]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -91,7 +80,7 @@ const BookSearch = () => {
         if (bookData.text) {
           if (bookData.text.text) {
             console.log("Book text preview (first 1000 chars):",
-              bookData.text.text.substring(0, 1000) + "...");
+              bookData.text.text.substring(0, 5000) + "...");
           }
           console.log("Text URL:", bookData.text.textUrl);
           console.log("Read URL:", bookData.text.readUrl);
@@ -114,19 +103,48 @@ const BookSearch = () => {
 
         // Clear the book search results to provide a cleaner UI
         dispatch(clearBooks());
-
-        // Scroll to the 3D book after a short delay
-        setTimeout(() => {
-          window.scrollTo({
-            top: window.innerHeight,
-            behavior: 'smooth'
-          });
-        }, 300);
       })
       .catch(err => {
         console.error("Error fetching book details:", err);
       });
   };
+
+  // Function to fetch book pages from Internet Archive
+  async function fetchBookPages(bookId, startPage, numPages = 5) {
+    const pages = [];
+    const baseUrl = `https://archive.org/download/${bookId}/page/page_`;
+
+    for (let i = startPage; i < startPage + numPages; i++) {
+      try {
+        // Create texture loader
+        const textureLoader = new THREE.TextureLoader();
+        // Load the page image as a texture
+        const pageTexture = await new Promise((resolve, reject) => {
+          textureLoader.load(
+            `${baseUrl}${i}.jpg`,
+            (texture) => {
+              // Process texture if needed (set color space, etc.)
+              texture.colorSpace = THREE.SRGBColorSpace;
+              resolve(texture);
+            },
+            undefined,
+            (error) => reject(error)
+          );
+        });
+
+        pages.push({
+          pageNumber: i,
+          texture: pageTexture
+        });
+
+        console.log(`Loaded page ${i} from Internet Archive`);
+      } catch (error) {
+        console.error(`Failed to load page ${i}:`, error);
+      }
+    }
+
+    return pages;
+  }
 
   return (
     <div className="book-search" ref={bookSearchRef}>

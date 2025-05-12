@@ -17,7 +17,7 @@ export const Experience = () => {
         shadow-mapSize-height={2048}
         shadow-bias={-0.0001}
       />
-      {selectedBook && <Book position={[0, 0, 0]} />}
+      {selectedBook && <Book />}
       <mesh position-y={-1.5} rotation-x={-Math.PI / 2} receiveShadow>
         <planeGeometry args={[100, 100]} />
         <shadowMaterial transparent opacity={0.2} />
