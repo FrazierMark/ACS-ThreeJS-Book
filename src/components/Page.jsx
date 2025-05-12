@@ -108,6 +108,7 @@ export const Page = ({ number, front, back, page, opened, bookClosed, ...props }
   const [frontTexture, setFrontTexture] = useState(null);
   const [backTexture, setBackTexture] = useState(null);
   const [texturesLoaded, setTexturesLoaded] = useState(false);
+  const [backCoverFailed, setBackCoverFailed] = useState(false);
 
   // Determine if this is a cover page
   const isFrontCover = number === 0;
@@ -125,40 +126,47 @@ export const Page = ({ number, front, back, page, opened, bookClosed, ...props }
   // Load textures from the API or fallback to static files
   useEffect(() => {
     const loadTextures = async () => {
-      let front, back;
+      let frontTex, backTex;
 
-      // For the front cover (first page) or back cover (last page)
-      if (number === 0 && bookCovers.front) {
-        // Try to load front cover from API
-        try {
-          front = await loadTextureFromUrl(bookCovers.front);
-        } catch (error) {
-          front = await loadTextureFromUrl(`/textures/${front}.jpg`);
+      try {
+        // Only load front cover from API, not back cover
+        if (isFrontCover && bookCovers.front) {
+          // Try to load front cover from API
+          frontTex = await loadTextureFromUrl(bookCovers.front);
         }
-      } else if (number === pages.length - 1 && bookCovers.back) {
-        // Try to load back cover from API
-        try {
-          back = await loadTextureFromUrl(bookCovers.back);
-        } catch (error) {
-          back = await loadTextureFromUrl(`/textures/${back}.jpg`);
+
+        // If we couldn't load front from API or it's not a front cover, load from static files
+        if (!frontTex) {
+          frontTex = await loadTextureFromUrl(`/textures/${front}.jpg`);
         }
-      } else {
-        // Load regular page textures
-        front = await loadTextureFromUrl(`/textures/${front}.jpg`);
-        back = await loadTextureFromUrl(`/textures/${back}.jpg`);
+
+        // Always load back cover from static files
+        backTex = await loadTextureFromUrl(`/textures/${back}.jpg`);
+
+        // Fix texture color space
+        if (frontTex) frontTex.colorSpace = SRGBColorSpace;
+        if (backTex) backTex.colorSpace = SRGBColorSpace;
+
+        setFrontTexture(frontTex);
+        setBackTexture(backTex);
+        setTexturesLoaded(true);
+      } catch (error) {
+        console.error("Error loading textures:", error);
+        // Still try to set any textures that did load
+        if (frontTex) {
+          frontTex.colorSpace = SRGBColorSpace;
+          setFrontTexture(frontTex);
+        }
+        if (backTex) {
+          backTex.colorSpace = SRGBColorSpace;
+          setBackTexture(backTex);
+        }
+        setTexturesLoaded(true);
       }
-
-      // Fix texture color space
-      if (front) front.colorSpace = SRGBColorSpace;
-      if (back) back.colorSpace = SRGBColorSpace;
-
-      setFrontTexture(front);
-      setBackTexture(back);
-      setTexturesLoaded(true);
     };
 
     loadTextures();
-  }, [number, front, back, pages.length, bookCovers]);
+  }, [number, front, back, pages.length, bookCovers, isFrontCover, isBackCover]);
 
   // Use static textures while dynamic ones load
   const [staticFront, staticBack] = useTexture([
@@ -199,15 +207,16 @@ export const Page = ({ number, front, back, page, opened, bookClosed, ...props }
     const frontRoughness = isFrontCover ? glossyRoughnessTexture : matteRoughnessTexture;
     const backRoughness = isBackCover ? glossyRoughnessTexture : matteRoughnessTexture;
 
+    // Create material array - first 4 are edge materials, then front and back
     const materials = [
-      ...pageMaterials,
-      new MeshStandardMaterial({
+      ...pageMaterials, // These are the edge materials [0-3]
+      new MeshStandardMaterial({ // Front material [4]
         color: whiteColor,
         map: picture,
         roughnessMap: frontRoughness,
         roughness: isFrontCover ? 0.1 : 0.6,
       }),
-      new MeshStandardMaterial({
+      new MeshStandardMaterial({ // Back material [5]
         color: whiteColor,
         map: picture2,
         roughnessMap: backRoughness,

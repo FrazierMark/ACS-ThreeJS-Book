@@ -5,7 +5,9 @@ import {
   loadMoreBooks,
   setSearchParams,
   fetchBookDetails,
-  getBookCovers
+  getBookCovers,
+  clearBooks,
+  clearBookDetails
 } from '../redux/actions/bookActions';
 import { getCoverImageUrl } from '../services/openLibraryApi';
 import '../styles/BookSearch.css';
@@ -109,6 +111,17 @@ const BookSearch = () => {
           backImg.onerror = () => console.log("Back cover failed to load");
           backImg.src = bookData.coverImages.back;
         }
+
+        // Clear the book search results to provide a cleaner UI
+        dispatch(clearBooks());
+
+        // Scroll to the 3D book after a short delay
+        setTimeout(() => {
+          window.scrollTo({
+            top: window.innerHeight,
+            behavior: 'smooth'
+          });
+        }, 300);
       })
       .catch(err => {
         console.error("Error fetching book details:", err);
@@ -121,79 +134,94 @@ const BookSearch = () => {
 
       {error && <div className="error">Error: {error}</div>}
 
-      {selectedBook && (
-        <div className="selected-book-indicator">
-          <p>Selected Book: <strong>{selectedBook.title}</strong></p>
-          <p>View the 3D book model below!</p>
-        </div>
-      )}
-
-      <form onSubmit={handleSearch}>
-        <div className="search-controls">
-          <input
-            type="text"
-            value={localSearchQuery}
-            onChange={(e) => setLocalSearchQuery(e.target.value)}
-            placeholder="Search for books..."
-            disabled={loading}
-          />
-
-          <select
-            value={localSearchType}
-            onChange={(e) => setLocalSearchType(e.target.value)}
-            disabled={loading}
-          >
-            <option value="general">All</option>
-            <option value="title">Title</option>
-            <option value="author">Author</option>
-          </select>
-
-          <button
-            type="submit"
-            disabled={loading || !localSearchQuery.trim()}
-          >
-            {loading && books.length === 0 ? 'Loading...' : 'Search'}
-          </button>
-        </div>
-      </form>
-
-      {loading && books.length === 0 ? (
-        <div className="loading">Loading books...</div>
-      ) : (
-        <>
-          <div className="books-grid">
-            {books.length > 0 ? (
-              books.map((book) => (
-                <div
-                  key={book.key}
-                  className={`book-card ${selectedBook && selectedBook.key === book.key ? 'selected' : ''}`}
-                  onClick={() => handleBookCardClick(book)}
-                  role="button"
-                  aria-label={`View details for ${book.title}`}
-                  tabIndex={0}
-                >
-                  {book.cover_i && (
-                    <img
-                      src={getCoverImageUrl(book.cover_i)}
-                      alt={book.title}
-                    />
-                  )}
-                  <h3>{book.title}</h3>
-                  {book.author_name && <p>By: {book.author_name.join(', ')}</p>}
-                  {book.first_publish_year && <p>Published: {book.first_publish_year}</p>}
-                </div>
-              ))
-            ) : (
-              <p className="no-results">No books found. Try a different search term.</p>
-            )}
+      {selectedBook ? (
+        <div className="selected-book-view">
+          <div className="selected-book-indicator">
+            <h3>Selected Book: <strong>{selectedBook.title}</strong></h3>
+            {selectedBook.author_name && <p>By: {selectedBook.author_name.join(', ')}</p>}
+            <p>Explore the 3D book model below!</p>
           </div>
 
-          {books.length > 0 && (
-            <div className="load-more">
-              <button onClick={handleLoadMore} disabled={loading}>
-                {loading ? 'Loading...' : 'Load More Books'}
+          <button
+            className="new-search-button"
+            onClick={() => {
+              dispatch(clearBookDetails());
+              setLocalSearchQuery('');
+            }}
+          >
+            Start New Search
+          </button>
+        </div>
+      ) : (
+        <>
+          <form onSubmit={handleSearch}>
+            <div className="search-controls">
+              <input
+                type="text"
+                value={localSearchQuery}
+                onChange={(e) => setLocalSearchQuery(e.target.value)}
+                placeholder="Search for books..."
+                disabled={loading}
+              />
+
+              <select
+                value={localSearchType}
+                onChange={(e) => setLocalSearchType(e.target.value)}
+                disabled={loading}
+              >
+                <option value="general">All</option>
+                <option value="title">Title</option>
+                <option value="author">Author</option>
+              </select>
+
+              <button
+                type="submit"
+                disabled={loading || !localSearchQuery.trim()}
+              >
+                {loading && books.length === 0 ? 'Loading...' : 'Search'}
               </button>
             </div>
+          </form>
+
+          {loading && books.length === 0 ? (
+            <div className="loading">Loading books...</div>
+          ) : (
+            <>
+              <div className="books-grid">
+                {books.length > 0 ? (
+                  books.map((book) => (
+                    <div
+                      key={book.key}
+                      className={`book-card ${selectedBook && selectedBook.key === book.key ? 'selected' : ''}`}
+                      onClick={() => handleBookCardClick(book)}
+                      role="button"
+                      aria-label={`View details for ${book.title}`}
+                      tabIndex={0}
+                    >
+                      {book.cover_i && (
+                        <img
+                          src={getCoverImageUrl(book.cover_i)}
+                          alt={book.title}
+                        />
+                      )}
+                      <h3>{book.title}</h3>
+                      {book.author_name && <p>By: {book.author_name.join(', ')}</p>}
+                      {book.first_publish_year && <p>Published: {book.first_publish_year}</p>}
+                    </div>
+                  ))
+                ) : (
+                  <p className="no-results">No books found. Try a different search term.</p>
+                )}
+              </div>
+
+              {books.length > 0 && (
+                <div className="load-more">
+                  <button onClick={handleLoadMore} disabled={loading}>
+                    {loading ? 'Loading...' : 'Load More Books'}
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </>
       )}

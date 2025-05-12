@@ -246,10 +246,22 @@ const getBookFormats = async (iaId) => {
 const getFullCoverImages = (isbn) => {
 	if (!isbn) return { front: null, back: null };
 
+	// Build URLs for different views
+	const frontUrl = `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`;
+	const backUrl = `https://covers.openlibrary.org/b/isbn/${isbn}-b-L.jpg`; // Note: back covers often aren't available
+	const spineUrl = `https://covers.openlibrary.org/b/isbn/${isbn}-s-L.jpg`; // Spine image
+
+	console.log('Cover URLs generated:', {
+		isbn,
+		frontUrl,
+		backUrl,
+		spineUrl,
+	});
+
 	return {
-		front: `https://covers.openlibrary.org/b/isbn/${isbn}-L.jpg`,
-		back: `https://covers.openlibrary.org/b/isbn/${isbn}-b-L.jpg`, // Note: back covers often aren't available
-		spine: `https://covers.openlibrary.org/b/isbn/${isbn}-s-L.jpg`, // Spine image
+		front: frontUrl,
+		back: backUrl,
+		spine: spineUrl,
 	};
 };
 
