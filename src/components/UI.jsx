@@ -1,5 +1,5 @@
 import { useSelector, useDispatch } from 'react-redux';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { getCurrentPage, getAllPages, setPage } from '../features/pagesSlice';
 import { fetchBooks, loadMoreBooks, setSearchParams, fetchBookDetails, clearBooks, clearBookDetails } from '../redux/actions/bookActions';
 import { getCoverImageUrl } from '../services/openLibraryApi';
@@ -15,6 +15,10 @@ export const UI = () => {
   const [localSearchQuery, setLocalSearchQuery] = useState('');
   const [localSearchType, setLocalSearchType] = useState('general');
   const [featuredSearchTerm] = useState('classics');
+
+  // Navigation pagination state
+  const [pageNavStart, setPageNavStart] = useState(0);
+  const MAX_PAGE_BUTTONS = 5; // Maximum number of page buttons to show (not including cover/back)
 
   useEffect(() => {
     if (books.length === 0 && !loading) {
@@ -33,6 +37,18 @@ export const UI = () => {
     audio.play();
   }, [page]);
 
+  // Adjust page navigation based on current page
+  useEffect(() => {
+    // If current page is outside our visible range, adjust the start
+    if (page > 0 && page < pages.length - 1) { // Not cover or back cover
+      if (page >= pageNavStart + MAX_PAGE_BUTTONS) {
+        setPageNavStart(page - Math.floor(MAX_PAGE_BUTTONS / 2));
+      } else if (page < pageNavStart) {
+        setPageNavStart(Math.max(1, page - 1));
+      }
+    }
+  }, [page, pages.length, pageNavStart]);
+
   const handleSearch = (e) => {
     e.preventDefault();
     if (!localSearchQuery.trim()) return;
@@ -50,40 +66,102 @@ export const UI = () => {
       });
   };
 
+  // Create the array of page buttons to display
+  const pageButtons = useMemo(() => {
+    if (!pages || pages.length <= 2) return []; // No internal pages
+
+    const buttons = [];
+
+    // Always add Cover button first
+    buttons.push(
+      <button
+        key="cover"
+        className={`border-transparent hover:border-white transition-all duration-300 px-4 py-3 rounded-full text-lg uppercase shrink-0 border ${0 === page
+          ? "bg-white/90 text-black"
+          : "bg-black/30 text-white"
+          }`}
+        onClick={() => dispatch(setPage(0))}
+      >
+        Cover
+      </button>
+    );
+
+    // Add Previous button if not at the beginning
+    if (pageNavStart > 1) {
+      buttons.push(
+        <button
+          key="prev"
+          className="border-transparent hover:border-white transition-all duration-300 px-4 py-3 rounded-full text-lg uppercase shrink-0 border bg-black/30 text-white"
+          onClick={() => setPageNavStart(Math.max(1, pageNavStart - MAX_PAGE_BUTTONS))}
+        >
+          &laquo;
+        </button>
+      );
+    }
+
+    // Add page buttons
+    const endIndex = Math.min(pageNavStart + MAX_PAGE_BUTTONS, pages.length - 1);
+    for (let i = pageNavStart; i < endIndex; i++) {
+      if (i >= 1) { // Skip cover (index 0)
+        buttons.push(
+          <button
+            key={i}
+            className={`border-transparent hover:border-white transition-all duration-300 px-4 py-3 rounded-full text-lg uppercase shrink-0 border ${i === page
+              ? "bg-white/90 text-black"
+              : "bg-black/30 text-white"
+              }`}
+            onClick={() => dispatch(setPage(i))}
+          >
+            {`Page ${i}`}
+          </button>
+        );
+      }
+    }
+
+    // Add Next button if not at the end
+    if (endIndex < pages.length - 1) {
+      buttons.push(
+        <button
+          key="next"
+          className="border-transparent hover:border-white transition-all duration-300 px-4 py-3 rounded-full text-lg uppercase shrink-0 border bg-black/30 text-white"
+          onClick={() => setPageNavStart(Math.min(pages.length - MAX_PAGE_BUTTONS - 1, pageNavStart + MAX_PAGE_BUTTONS))}
+        >
+          &raquo;
+        </button>
+      );
+    }
+
+    // Always add Back Cover button last
+    buttons.push(
+      <button
+        key="backcover"
+        className={`border-transparent hover:border-white transition-all duration-300 px-4 py-3 rounded-full text-lg uppercase shrink-0 border ${pages.length - 1 === page
+          ? "bg-white/90 text-black"
+          : "bg-black/30 text-white"
+          }`}
+        onClick={() => dispatch(setPage(pages.length - 1))}
+      >
+        Back Cover
+      </button>
+    );
+
+    return buttons;
+  }, [pages, page, pageNavStart, dispatch]);
+
   return (
     <>
       <main className="pointer-events-none select-none z-10 inset-0 flex justify-between flex-col">
         <a
-          className="pointer-events-auto mt-10 ml-10"
+          className="pointer-events-auto absolute top-0 left-0 m-5 ml-10"
           href=""
         >
           <img className="w-14" src="/images/Shape.png" />
         </a>
 
         {selectedBook && (
-          <div className="w-full overflow-auto pointer-events-auto fixed flex justify-center">
+          <div className="w-full overflow-auto pointer-events-auto absolute z-20 bottom-0 left-0 flex justify-center">
             <div className="overflow-auto flex items-center gap-4 max-w-full p-10">
-              {[...pages].map((_, index) => (
-                <button
-                  key={index}
-                  className={`border-transparent hover:border-white transition-all duration-300  px-4 py-3 rounded-full  text-lg uppercase shrink-0 border ${index === page
-                    ? "bg-white/90 text-black"
-                    : "bg-black/30 text-white"
-                    }`}
-                  onClick={() => dispatch(setPage(index))}
-                >
-                  {index === 0 ? "Cover" : `Page ${index}`}
-                </button>
-              ))}
-              <button
-                className={`border-transparent hover:border-white transition-all duration-300  px-4 py-3 rounded-full  text-lg uppercase shrink-0 border ${page === pages.length
-                  ? "bg-white/90 text-black"
-                  : "bg-black/30 text-white"
-                  }`}
-                onClick={() => dispatch(setPage(pages.length))}
-              >
-                Back Cover
-              </button>
+              {pageButtons}
             </div>
           </div>
         )}

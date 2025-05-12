@@ -12,7 +12,7 @@ import { loadTextureFromUrl, loadFallbackTexture } from "../services/textureServ
 
 const PAGE_WIDTH = 1.28;
 const PAGE_HEIGHT = 1.71; //4:3 aspect ratio
-const PAGE_DEPTH = 0.003;
+const PAGE_DEPTH = 0.002;
 const PAGE_SEGMENTS = 30;
 const SEGMENT_WIDTH = PAGE_WIDTH / PAGE_SEGMENTS;
 
@@ -100,9 +100,13 @@ const createRoughnessTexture = (roughnessValue, size = 32) => {
 const glossyRoughnessTexture = createRoughnessTexture(0.1);   // For covers (glossy)
 const matteRoughnessTexture = createRoughnessTexture(0.6);    // For pages (matte)
 
-export const Page = ({ number, front, back, page, opened, bookClosed, ...props }) => {
+export const Page = ({ number, front, back, page, opened, bookClosed, thickness, ...props }) => {
   const pages = useSelector(getAllPages);
   const bookCovers = useSelector(getBookCovers);
+  const selectedBook = useSelector(state => state.books.selectedBook);
+
+  // Use the provided thickness or default to PAGE_DEPTH
+  const pageDepth = thickness || PAGE_DEPTH;
 
   // State to hold dynamically loaded textures
   const [frontTexture, setFrontTexture] = useState(null);
@@ -129,10 +133,16 @@ export const Page = ({ number, front, back, page, opened, bookClosed, ...props }
       let frontTex, backTex;
 
       try {
-        // Only load front cover from API, not back cover
+        // Load front cover from API for front cover page
         if (isFrontCover && bookCovers.front) {
           // Try to load front cover from API
           frontTex = await loadTextureFromUrl(bookCovers.front);
+        }
+
+        // Load back cover from API for back cover page
+        if (isBackCover && bookCovers.back) {
+          // Try to load back cover from API
+          backTex = await loadTextureFromUrl(bookCovers.back);
         }
 
         // If we couldn't load front from API or it's not a front cover, load from static files
@@ -140,8 +150,10 @@ export const Page = ({ number, front, back, page, opened, bookClosed, ...props }
           frontTex = await loadTextureFromUrl(`/textures/${front}.jpg`);
         }
 
-        // Always load back cover from static files
-        backTex = await loadTextureFromUrl(`/textures/${back}.jpg`);
+        // If we couldn't load back from API or it's not a back cover, load from static files
+        if (!backTex) {
+          backTex = await loadTextureFromUrl(`/textures/${back}.jpg`);
+        }
 
         // Fix texture color space
         if (frontTex) frontTex.colorSpace = SRGBColorSpace;
@@ -242,12 +254,12 @@ export const Page = ({ number, front, back, page, opened, bookClosed, ...props }
       turnedAt.current = +new Date();
       lastOpened.current = opened;
     }
-    let turningTime = Math.min(400, new Date() - turnedAt.current) / 400;
+    let turningTime = Math.min(300, new Date() - turnedAt.current) / 300;
     turningTime = Math.sin(turningTime * Math.PI);
 
     let targetRotation = opened ? -Math.PI / 2 : Math.PI / 2;
     if (!bookClosed) {
-      targetRotation += degToRad(number * 0.8)
+      targetRotation += degToRad(number * 0.4)
     }
 
     const bones = skinnedMeshRef.current.skeleton.bones;
@@ -278,7 +290,7 @@ export const Page = ({ number, front, back, page, opened, bookClosed, ...props }
       <primitive
         object={manualSkinnedMesh}
         ref={skinnedMeshRef}
-        position-z={-number * PAGE_DEPTH + page * PAGE_DEPTH}
+        position-z={-number * pageDepth + page * pageDepth}
       />
     </group>
   )

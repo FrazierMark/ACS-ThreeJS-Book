@@ -331,6 +331,55 @@ const getBookText = async (iaId) => {
 };
 
 /**
+ * Get author details by author key
+ * @param {string} authorKey - Open Library author key (e.g., '/authors/OL24638A')
+ * @returns {Promise} Promise with author details
+ */
+const getAuthorDetails = async (authorKey) => {
+	try {
+		// Remove the /authors/ prefix if it's included
+		const cleanKey = authorKey.replace(/^\/authors\//, '');
+
+		const response = await axios.get(
+			`${OPEN_LIBRARY_BASE_URL}/authors/${cleanKey}.json`
+		);
+		return response.data;
+	} catch (error) {
+		console.error(`Error fetching author details for ${authorKey}:`, error);
+		return null;
+	}
+};
+
+/**
+ * Get detailed book information by ISBN
+ * @param {string} isbn - ISBN of the book
+ * @returns {Promise} Promise with detailed book information
+ */
+const getDetailedBookByISBN = async (isbn) => {
+	try {
+		if (!isbn) throw new Error('ISBN is required');
+
+		const response = await axios.get(`${OPEN_LIBRARY_BASE_URL}/api/books`, {
+			params: {
+				bibkeys: `ISBN:${isbn}`,
+				format: 'json',
+				jscmd: 'details',
+			},
+		});
+
+		// Return the details object for the ISBN
+		const data = response.data[`ISBN:${isbn}`];
+		return data?.details || null;
+	} catch (error) {
+		console.error(
+			`Error fetching detailed book information for ISBN ${isbn}:`,
+			error
+		);
+		return null;
+	}
+};
+
+/**
  * Get all book metadata including formats, covers, and content
  * @param {Object} book - Basic book object from search results
  * @returns {Promise} Promise with complete book data
@@ -351,6 +400,9 @@ const getCompleteBookData = async (book) => {
 			formats: null,
 			text: null,
 			coverImages: null,
+			authorDetails: [],
+			numberOfPages: null,
+			detailedInfo: null,
 		};
 
 		// Step 4: Get ISBN if available (from the first edition with ISBN)
@@ -367,9 +419,30 @@ const getCompleteBookData = async (book) => {
 			}
 		}
 
-		// Step 5: Get cover images if ISBN is available
+		// Step 5: If ISBN is available, get detailed book information and cover images
 		if (isbn) {
-			completeData.coverImages = getFullCoverImages(isbn);
+			// Get detailed information
+			const detailedInfo = await getDetailedBookByISBN(isbn);
+			if (detailedInfo) {
+				completeData.detailedInfo = detailedInfo;
+				completeData.numberOfPages = detailedInfo.number_of_pages || null;
+
+				// If detailed info has covers, set them
+				if (detailedInfo.covers && detailedInfo.covers.length > 0) {
+					const coverId = detailedInfo.covers[0];
+					completeData.coverImages = {
+						front: `https://covers.openlibrary.org/b/id/${coverId}-L.jpg`,
+						back: `https://covers.openlibrary.org/b/id/${coverId}-b-L.jpg`,
+						spine: `https://covers.openlibrary.org/b/id/${coverId}-s-L.jpg`,
+					};
+				} else {
+					// Fallback to the standard cover images by ISBN
+					completeData.coverImages = getFullCoverImages(isbn);
+				}
+			} else {
+				// Fallback to the standard cover images by ISBN
+				completeData.coverImages = getFullCoverImages(isbn);
+			}
 		}
 
 		// Step 6: If readable, get book formats and text
@@ -389,6 +462,28 @@ const getCompleteBookData = async (book) => {
 			} catch (textError) {
 				console.warn('Could not fetch text:', textError);
 			}
+		}
+
+		// Step 7: Fetch author details if available
+		if (details.authors && details.authors.length > 0) {
+			const authorPromises = details.authors.map(async (authorEntry) => {
+				if (authorEntry.author && authorEntry.author.key) {
+					const authorData = await getAuthorDetails(authorEntry.author.key);
+					if (authorData) {
+						return {
+							...authorData,
+							role: authorEntry.type?.key?.replace('/type/', '') || 'author',
+						};
+					}
+				}
+				return null;
+			});
+
+			// Wait for all author details to be fetched
+			const authorResults = await Promise.all(authorPromises);
+			completeData.authorDetails = authorResults.filter(
+				(author) => author !== null
+			);
 		}
 
 		return completeData;
@@ -413,4 +508,6 @@ export {
 	getFullCoverImages,
 	getBookText,
 	getCompleteBookData,
+	getAuthorDetails,
+	getDetailedBookByISBN,
 };

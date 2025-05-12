@@ -19,12 +19,25 @@ const ChatWindow = () => {
   useEffect(() => {
     if (selectedBook) {
       const bookTitle = selectedBook.title;
-      const bookAuthor = selectedBook.author_name ? selectedBook.author_name[0] : 'Unknown';
+
+      // Get author information - use author details if available, otherwise fallback to author_name
+      let authorInfo = "Unknown";
+      if (selectedBook.authorDetails && selectedBook.authorDetails.length > 0) {
+        authorInfo = selectedBook.authorDetails.map(author => author.name).join(', ');
+      } else if (selectedBook.author_name) {
+        authorInfo = selectedBook.author_name.join(', ');
+      }
+
+      // Add pages info if available
+      let pagesInfo = '';
+      if (selectedBook.numberOfPages) {
+        pagesInfo = ` The book has ${selectedBook.numberOfPages} pages.`;
+      }
 
       // Initial message from AI
       const initialMessage = {
         role: 'ai',
-        content: `Hello! I see you're exploring "${bookTitle}" by ${bookAuthor}. What would you like to know about this book?`
+        content: `Hello! I see you're exploring "${bookTitle}" by ${authorInfo}.${pagesInfo} What would you like to know about this book?`
       };
 
       setMessages([initialMessage]);
@@ -46,10 +59,67 @@ const ChatWindow = () => {
     setIsLoading(true);
 
     try {
-      // Create context about the book for better AI responses
-      const bookContext = selectedBook ?
-        `The user is reading "${selectedBook.title}" ${selectedBook.author_name ? `by ${selectedBook.author_name.join(', ')}` : ''}.` :
-        '';
+      // Create detailed context about the book and its authors for better AI responses
+      let bookContext = "";
+
+      if (selectedBook) {
+        // Basic book info
+        bookContext = `The user is reading "${selectedBook.title}"`;
+
+        // Author information
+        if (selectedBook.authorDetails && selectedBook.authorDetails.length > 0) {
+          // Use comprehensive author details
+          const authorNames = selectedBook.authorDetails.map(author => author.name).join(', ');
+          bookContext += ` by ${authorNames}.`;
+
+          // Add author bios if available
+          const authorBios = selectedBook.authorDetails
+            .filter(author => author.bio)
+            .map(author => `${author.name}: ${typeof author.bio === 'string' ? author.bio : author.bio.value || 'No biography available'}`)
+            .join('\n');
+
+          if (authorBios) {
+            bookContext += `\nAuthor information:\n${authorBios}`;
+          }
+        } else if (selectedBook.author_name) {
+          // Fallback to simple author names
+          bookContext += ` by ${selectedBook.author_name.join(', ')}.`;
+        }
+
+        // Add number of pages if available
+        if (selectedBook.numberOfPages) {
+          bookContext += ` The book has ${selectedBook.numberOfPages} pages.`;
+        }
+
+        // Add publication date if available
+        if (selectedBook.first_publish_year) {
+          bookContext += ` It was first published in ${selectedBook.first_publish_year}.`;
+        }
+
+        // Add detailed info if available
+        if (selectedBook.detailedInfo) {
+          // Add publishers
+          if (selectedBook.detailedInfo.publishers && selectedBook.detailedInfo.publishers.length > 0) {
+            bookContext += `\nPublished by: ${selectedBook.detailedInfo.publishers.join(', ')}`;
+          }
+
+          // Add subjects/genres
+          if (selectedBook.detailedInfo.subjects && selectedBook.detailedInfo.subjects.length > 0) {
+            bookContext += `\nSubjects: ${selectedBook.detailedInfo.subjects.slice(0, 5).join(', ')}`;
+          }
+        }
+
+        // Add description if available
+        if (selectedBook.description) {
+          const description = typeof selectedBook.description === 'string'
+            ? selectedBook.description
+            : selectedBook.description.value || '';
+
+          if (description) {
+            bookContext += `\nBook description: ${description}`;
+          }
+        }
+      }
 
       // Prepare conversation history for AI
       const promptMessages = [
