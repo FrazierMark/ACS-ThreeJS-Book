@@ -1,6 +1,7 @@
 # 3D Book Viewer Web Application
 
-![3D Book Viewer](public/images/Shape.png)
+<img width="1697" alt="Screenshot 2025-05-12 at 4 00 22 PM" src="https://github.com/user-attachments/assets/0630ecfc-cf7a-45f2-904d-c79c2c48fa17" />
+
 
 A modern, interactive 3D book viewer built with React, Redux, and Three.js. This application allows users to search for books from the Open Library API, view them in a realistic 3D environment, and interact with the content using an AI-powered chat assistant.
 
