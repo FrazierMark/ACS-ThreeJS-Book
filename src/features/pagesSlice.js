@@ -8,23 +8,16 @@ import {
 const DEFAULT_FRONT = 'front';
 const DEFAULT_BACK = 'back';
 
-// Initial set of two pages (front and back cover)
-const initialPages = [
-	{
-		front: DEFAULT_FRONT,
-		back: DEFAULT_BACK,
-	},
-	{
-		front: DEFAULT_BACK,
-		back: DEFAULT_BACK,
-	},
-];
-
 const pagesSlice = createSlice({
 	name: 'pages',
 	initialState: {
 		currentPage: 0,
-		pages: initialPages,
+		pages: [
+			{
+				front: DEFAULT_FRONT,
+				back: DEFAULT_BACK,
+			},
+		],
 	},
 	reducers: {
 		setPage: (state, action) => {
@@ -37,9 +30,7 @@ const pagesSlice = createSlice({
 				const bookDetails = action.payload.details;
 
 				// Get number of pages from the book details, with minimum of 1
-				const numPages = Math.max(1, bookDetails.numberOfPages || 9);
-
-				console.log('numPages', numPages);
+				const numPages = Math.max(1, bookDetails.numberOfPages || 10);
 
 				// Create new pages array - always start with front cover
 				const newPages = [
@@ -49,14 +40,8 @@ const pagesSlice = createSlice({
 					},
 				];
 
-				// Calculate appropriate number of content pages based on book page count
-				// We need to create enough 3D book pages to represent the real book
-				// Each page in our 3D model has a front and back, representing 2 book pages
-				// So we'll create approximately numPages/2 internal pages (rounded up)
-				const internalPagesCount = Math.ceil(numPages / 2);
-
 				// Create internal pages
-				for (let i = 0; i < internalPagesCount; i++) {
+				for (let i = 0; i < numPages; i += 2) {
 					newPages.push({
 						front: DEFAULT_FRONT,
 						back: DEFAULT_BACK,
@@ -74,8 +59,13 @@ const pagesSlice = createSlice({
 				state.currentPage = 0; // Reset to front cover
 			})
 			.addCase(CLEAR_BOOK_DETAILS, (state) => {
-				// Reset pages to initial state when book is cleared
-				state.pages = initialPages;
+				// Reset pages to default state
+				state.pages = [
+					{
+						front: DEFAULT_FRONT,
+						back: DEFAULT_BACK,
+					},
+				];
 				state.currentPage = 0;
 			});
 	},

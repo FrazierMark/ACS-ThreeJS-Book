@@ -13,7 +13,7 @@ export const UI = () => {
   const { books, loading, error, searchQuery, searchType } = useSelector(state => state.books);
 
   const [localSearchQuery, setLocalSearchQuery] = useState('');
-  const [localSearchType, setLocalSearchType] = useState('general');
+  const [localSearchType, setLocalSearchType] = useState('classics');
   const [featuredSearchTerm] = useState('classics');
 
   // Navigation pagination state
@@ -139,7 +139,7 @@ export const UI = () => {
           ? "bg-white/90 text-black"
           : "bg-black/30 text-white"
           }`}
-        onClick={() => dispatch(setPage(pages.length - 1))}
+        onClick={() => dispatch(setPage(pages.length))}
       >
         Back Cover
       </button>

@@ -16,12 +16,10 @@ function App() {
 
       {selectedBook && (
         <div className="flex w-full h-screen">
-          {/* Chat Window (left side) */}
           <div className="w-1/3 p-4 pt-20">
             <ChatWindow />
           </div>
 
-          {/* 3D Book (right side) */}
           <div className="w-2/3">
             <Canvas shadows camera={{ position: [-0.5, 1, 4], fov: 45 }}>
               <group position-y={0}>
