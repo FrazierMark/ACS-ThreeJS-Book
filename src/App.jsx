@@ -3,10 +3,11 @@ import { Canvas } from "@react-three/fiber";
 import { Suspense } from "react";
 import { Experience } from "./components/Experience";
 import { UI } from "./components/UI";
-
+import BookSearch from "./components/BookSearch";
 function App() {
   return (
     <>
+      <BookSearch />
       <UI />
       <Loader />
       <Canvas shadows camera={{ position: [-0.5, 1, 4], fov: 45 }}>

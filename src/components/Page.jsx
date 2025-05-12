@@ -1,12 +1,14 @@
-import { useRef, useMemo, useEffect } from "react";
-import { BoxGeometry, MeshStandardMaterial, SkinnedMesh, Bone, Skeleton, Vector3, Uint16BufferAttribute, Float32BufferAttribute, Color } from "three";
+import { useRef, useMemo, useEffect, useState } from "react";
+import { BoxGeometry, MeshStandardMaterial, SkinnedMesh, Bone, Skeleton, Vector3, Uint16BufferAttribute, Float32BufferAttribute, Color, DataTexture, RGBAFormat } from "three";
 import { useHelper, useTexture } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useSelector } from "react-redux";
 import { getAllPages } from "../features/pagesSlice";
+import { getBookCovers } from "../redux/actions/bookActions";
 import { degToRad, MathUtils } from "three/src/math/MathUtils";
 import { easing } from 'maath';
-import { SkeletonHelper, SRGBColorSpace } from "three";
+import { SkeletonHelper, SRGBColorSpace, Texture } from "three";
+import { loadTextureFromUrl, loadFallbackTexture } from "../services/textureService";
 
 const PAGE_WIDTH = 1.28;
 const PAGE_HEIGHT = 1.71; //4:3 aspect ratio
@@ -76,25 +78,99 @@ const pageMaterials = [
   }),
 ]
 
+// Create a programmatic roughness texture
+const createRoughnessTexture = (roughnessValue, size = 32) => {
+  // Create a texture filled with the roughness value
+  const data = new Uint8Array(size * size * 4);
+  const value = Math.floor(roughnessValue * 255);
+
+  for (let i = 0; i < size * size * 4; i += 4) {
+    data[i] = value;     // R
+    data[i + 1] = value; // G
+    data[i + 2] = value; // B
+    data[i + 3] = 255;   // A (opacity)
+  }
+
+  const roughnessTexture = new DataTexture(data, size, size, RGBAFormat);
+  roughnessTexture.needsUpdate = true;
+  return roughnessTexture;
+};
+
+// Create various roughness textures
+const glossyRoughnessTexture = createRoughnessTexture(0.1);   // For covers (glossy)
+const matteRoughnessTexture = createRoughnessTexture(0.6);    // For pages (matte)
+
 export const Page = ({ number, front, back, page, opened, bookClosed, ...props }) => {
   const pages = useSelector(getAllPages);
+  const bookCovers = useSelector(getBookCovers);
+
+  // State to hold dynamically loaded textures
+  const [frontTexture, setFrontTexture] = useState(null);
+  const [backTexture, setBackTexture] = useState(null);
+  const [texturesLoaded, setTexturesLoaded] = useState(false);
+
+  // Determine if this is a cover page
+  const isFrontCover = number === 0;
+  const isBackCover = number === pages.length - 1;
+  const isCover = isFrontCover || isBackCover;
 
   // Preload textures when component mounts
   useEffect(() => {
     pages.forEach(page => {
       useTexture.preload(`/textures/${page.front}.jpg`);
       useTexture.preload(`/textures/${page.back}.jpg`);
-      useTexture.preload(`/textures/book-cover-roughness.jpg`);
     });
   }, [pages]);
 
-  const [picture, picture2, pictureRoughness] = useTexture([
+  // Load textures from the API or fallback to static files
+  useEffect(() => {
+    const loadTextures = async () => {
+      let front, back;
+
+      // For the front cover (first page) or back cover (last page)
+      if (number === 0 && bookCovers.front) {
+        // Try to load front cover from API
+        try {
+          front = await loadTextureFromUrl(bookCovers.front);
+        } catch (error) {
+          front = await loadTextureFromUrl(`/textures/${front}.jpg`);
+        }
+      } else if (number === pages.length - 1 && bookCovers.back) {
+        // Try to load back cover from API
+        try {
+          back = await loadTextureFromUrl(bookCovers.back);
+        } catch (error) {
+          back = await loadTextureFromUrl(`/textures/${back}.jpg`);
+        }
+      } else {
+        // Load regular page textures
+        front = await loadTextureFromUrl(`/textures/${front}.jpg`);
+        back = await loadTextureFromUrl(`/textures/${back}.jpg`);
+      }
+
+      // Fix texture color space
+      if (front) front.colorSpace = SRGBColorSpace;
+      if (back) back.colorSpace = SRGBColorSpace;
+
+      setFrontTexture(front);
+      setBackTexture(back);
+      setTexturesLoaded(true);
+    };
+
+    loadTextures();
+  }, [number, front, back, pages.length, bookCovers]);
+
+  // Use static textures while dynamic ones load
+  const [staticFront, staticBack] = useTexture([
     `/textures/${front}.jpg`,
     `/textures/${back}.jpg`,
-    ...(number === 0 || number === pages.length - 1) ? [`/textures/book-cover-roughness.jpg`] : []
   ]);
 
-  picture.colorSpace = picture2.colorSpace = SRGBColorSpace;
+  staticFront.colorSpace = staticBack.colorSpace = SRGBColorSpace;
+
+  // Use dynamic textures when loaded, otherwise fallback to static ones
+  const picture = frontTexture || staticFront;
+  const picture2 = backTexture || staticBack;
 
   const groupRef = useRef();
   const lastOpened = useRef(opened);
@@ -119,29 +195,23 @@ export const Page = ({ number, front, back, page, opened, bookClosed, ...props }
     }
     const skeleton = new Skeleton(bones);
 
+    // Choose the appropriate roughness texture based on page type
+    const frontRoughness = isFrontCover ? glossyRoughnessTexture : matteRoughnessTexture;
+    const backRoughness = isBackCover ? glossyRoughnessTexture : matteRoughnessTexture;
+
     const materials = [
       ...pageMaterials,
       new MeshStandardMaterial({
         color: whiteColor,
         map: picture,
-        ...(number === 0
-          ? {
-            roughnessMap: pictureRoughness,
-          }
-          : {
-            roughness: 0.1,
-          }),
+        roughnessMap: frontRoughness,
+        roughness: isFrontCover ? 0.1 : 0.6,
       }),
       new MeshStandardMaterial({
         color: whiteColor,
         map: picture2,
-        ...(number === pages.length - 1
-          ? {
-            roughnessMap: pictureRoughness,
-          }
-          : {
-            roughness: 0.1,
-          }),
+        roughnessMap: backRoughness,
+        roughness: isBackCover ? 0.1 : 0.6,
       }),
     ];
 
@@ -153,7 +223,7 @@ export const Page = ({ number, front, back, page, opened, bookClosed, ...props }
     mesh.add(skeleton.bones[0]);
     mesh.bind(skeleton);
     return mesh;
-  }, []);
+  }, [picture, picture2, isFrontCover, isBackCover]);
 
   useHelper(skinnedMeshRef, SkeletonHelper, "red");
   useFrame((_, delta) => {

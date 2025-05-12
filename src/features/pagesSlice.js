@@ -2,28 +2,46 @@ import { createSlice } from '@reduxjs/toolkit';
 
 // Import the pictures array and pages setup from UI.jsx
 const pictures = [
-	'DSC00680',
-	'DSC00933',
-	'DSC00966',
-	'DSC00983',
-	'DSC01011',
-	'DSC01040',
-	'DSC01064',
-	'DSC01071',
-	'DSC01103',
-	'DSC01145',
-	'DSC01420',
-	'DSC01461',
-	'DSC01489',
-	'DSC02031',
-	'DSC02064',
-	'DSC02069',
+	'front',
+	'front',
+	'front',
+	'front',
+	'front',
+	'front',
+	'front',
+	'front',
+	'front',
+	'front',
+	'front',
+	'front',
+	'front',
+	'front',
+	'front',
+	'front',
+	'front',
+	'front',
+	'front',
+	'front',
+	'front',
+	'front',
+	'front',	
+	'front',
+	'front',
+	'front',
+	'front',
+	'front',
+	'front',
+	'front',
+	'front',
+	'front',
+	'front',
+	'front',
 ];
 
 export const pages = [
 	{
-		front: 'book-cover',
-		back: pictures[0],
+		front: 'front',
+		back: 'back',
 	},
 ];
 
@@ -36,7 +54,7 @@ for (let i = 1; i < pictures.length - 1; i += 2) {
 
 pages.push({
 	front: pictures[pictures.length - 1],
-	back: 'book-back',
+	back: 'back',
 });
 
 const pagesSlice = createSlice({
